@@ -35,6 +35,35 @@ export async function generatePDFAsImage(images: CroppedImage[], orderInfo: Orde
   const effectiveHeight = pageHeightPx - 2 * marginPx - Math.round(0.591 * dpi) // 15mm for header
   const rows = Math.floor((effectiveHeight + separationPx) / (magnetSizePx + separationPx))
 
+  // Create main canvas
+  const canvas = document.createElement("canvas")
+  const ctx = canvas.getContext("2d")
+  if (!ctx) throw new Error("Could not create canvas context")
+
+  canvas.width = pageWidthPx
+  canvas.height = pageHeightPx
+
+  // Fill with white background
+  ctx.fillStyle = "#FFFFFF"
+  ctx.fillRect(0, 0, pageWidthPx, pageHeightPx)
+
+  // Add header
+  ctx.fillStyle = "#000000"
+  ctx.font = `bold ${Math.round(0.118 * dpi)}px Arial, sans-serif` // 10pt at 300 DPI, bold
+  ctx.textAlign = "left"
+
+  const totalMagnetsGenerated = images.reduce((sum, img) => sum + img.quantity, 0)
+  const headerText = `Pedido: ${orderInfo.orderNumber} | ${orderInfo.customerName} | ${orderInfo.phone} | ${totalMagnetsGenerated} imanes`
+  ctx.fillText(headerText, marginPx, marginPx + Math.round(0.236 * dpi)) // 6mm from top
+
+  // Add separator line
+  ctx.strokeStyle = "#C8C8C8"
+  ctx.lineWidth = Math.round(0.0197 * dpi) // 0.5mm
+  ctx.beginPath()
+  ctx.moveTo(marginPx, marginPx + Math.round(0.394 * dpi)) // 10mm from top
+  ctx.lineTo(pageWidthPx - marginPx, marginPx + Math.round(0.394 * dpi))
+  ctx.stroke()
+
   // Generate all magnet instances
   const magnetInstances: { image: CroppedImage; instanceNumber: number }[] = []
   images.forEach((image) => {
@@ -46,9 +75,6 @@ export async function generatePDFAsImage(images: CroppedImage[], orderInfo: Orde
   // Calculate pages needed
   const magnetsPerPage = rows * cols
   const totalPages = Math.ceil(magnetInstances.length / magnetsPerPage)
-
-  console.log(`Generating ${totalPages} pages for ${magnetInstances.length} magnets`)
-  console.log(`Layout: ${rows} rows x ${cols} cols = ${magnetsPerPage} magnets per page`)
 
   // Create final canvas with all pages
   const finalCanvas = document.createElement("canvas")
@@ -62,111 +88,96 @@ export async function generatePDFAsImage(images: CroppedImage[], orderInfo: Orde
   finalCtx.fillStyle = "#FFFFFF"
   finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height)
 
-  // Helper function to load image
-  const loadImage = (src: string): Promise<HTMLImageElement> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image()
-      img.crossOrigin = "anonymous"
-      img.onload = () => resolve(img)
-      img.onerror = () => reject(new Error(`Failed to load image: ${src.substring(0, 50)}...`))
-      img.src = src
-    })
-  }
+  let currentPage = 0
+  let currentRow = 0
+  let currentCol = 0
+  const startY = marginPx + Math.round(0.551 * dpi) // 14mm from top
 
-  // Process all magnets sequentially
-  for (let magnetIndex = 0; magnetIndex < magnetInstances.length; magnetIndex++) {
-    const { image } = magnetInstances[magnetIndex]
+  for (let i = 0; i < magnetInstances.length; i++) {
+    const { image } = magnetInstances[i]
 
-    if (!image.croppedDataUrl) {
-      console.warn(`Skipping magnet ${magnetIndex + 1}: no cropped data`)
-      continue
+    if (!image.croppedDataUrl) continue
+
+    // Check if we need a new page
+    if (currentRow >= rows) {
+      currentPage++
+      currentRow = 0
+      currentCol = 0
+
+      // Draw page separator and header for new page
+      const pageY = currentPage * pageHeightPx
+
+      // Fill page background
+      finalCtx.fillStyle = "#FFFFFF"
+      finalCtx.fillRect(0, pageY, pageWidthPx, pageHeightPx)
+
+      // Add header for new page
+      finalCtx.fillStyle = "#000000"
+      finalCtx.font = `bold ${Math.round(0.118 * dpi)}px Arial, sans-serif`
+      finalCtx.textAlign = "left"
+      const pageHeaderText = `${orderInfo.customerName} - Pedido: ${orderInfo.orderNumber} (Página ${currentPage + 1})`
+      finalCtx.fillText(pageHeaderText, marginPx, pageY + marginPx + Math.round(0.236 * dpi))
+
+      // Add separator line
+      finalCtx.strokeStyle = "#C8C8C8"
+      finalCtx.lineWidth = Math.round(0.0197 * dpi)
+      finalCtx.beginPath()
+      finalCtx.moveTo(marginPx, pageY + marginPx + Math.round(0.394 * dpi))
+      finalCtx.lineTo(pageWidthPx - marginPx, pageY + marginPx + Math.round(0.394 * dpi))
+      finalCtx.stroke()
     }
 
-    // Calculate which page this magnet belongs to
-    const pageIndex = Math.floor(magnetIndex / magnetsPerPage)
-    const magnetIndexInPage = magnetIndex % magnetsPerPage
-
-    // Calculate position within the page
-    const row = Math.floor(magnetIndexInPage / cols)
-    const col = magnetIndexInPage % cols
-
-    const x = marginPx + col * (magnetSizePx + separationPx)
-    const pageY = pageIndex * pageHeightPx
-    const startY = pageY + marginPx + Math.round(0.551 * dpi) // 14mm from top of page
-    const y = startY + row * (magnetSizePx + separationPx)
+    // Calculate position
+    const x = marginPx + currentCol * (magnetSizePx + separationPx)
+    const y = currentPage * pageHeightPx + startY + currentRow * (magnetSizePx + separationPx)
 
     try {
-      console.log(`Processing magnet ${magnetIndex + 1}/${magnetInstances.length} on page ${pageIndex + 1}`)
-
       // Load and draw the image
-      const img = await loadImage(image.croppedDataUrl)
+      const img = new Image()
+      img.crossOrigin = "anonymous"
 
-      // Draw the magnet image
-      finalCtx.drawImage(img, x, y, magnetSizePx, magnetSizePx)
+      await new Promise((resolve, reject) => {
+        img.onload = () => {
+          // Draw the magnet image
+          finalCtx.drawImage(img, x, y, magnetSizePx, magnetSizePx)
 
-      // Draw dotted border as cutting guide
-      finalCtx.strokeStyle = "#969696"
-      finalCtx.lineWidth = Math.round(0.0079 * dpi) // 0.2mm
-      finalCtx.setLineDash([Math.round(0.059 * dpi), Math.round(0.039 * dpi)]) // 1.5mm, 1mm
+          // Draw dotted border as cutting guide
+          finalCtx.strokeStyle = "#969696"
+          finalCtx.lineWidth = Math.round(0.0079 * dpi) // 0.2mm
+          finalCtx.setLineDash([Math.round(0.059 * dpi), Math.round(0.039 * dpi)]) // 1.5mm, 1mm
 
-      const cornerRadius = Math.round(magnetSizePx * 0.123) // 8mm proportionally
+          const cornerRadius = Math.round(magnetSizePx * 0.123) // 8mm proportionally
 
-      // Draw rounded rectangle border
-      finalCtx.beginPath()
-      finalCtx.roundRect(x, y, magnetSizePx, magnetSizePx, cornerRadius)
-      finalCtx.stroke()
+          // Draw rounded rectangle border
+          finalCtx.beginPath()
+          finalCtx.roundRect(x, y, magnetSizePx, magnetSizePx, cornerRadius)
+          finalCtx.stroke()
 
-      // Reset line dash
-      finalCtx.setLineDash([])
+          // Reset line dash
+          finalCtx.setLineDash([])
+
+          resolve(true)
+        }
+        img.onerror = reject
+        img.src = image.croppedDataUrl!
+      })
     } catch (error) {
-      console.error(`Error processing magnet ${magnetIndex + 1}:`, error)
-      // Continue with next magnet instead of failing completely
-    }
-  }
-
-  // Add headers to all pages after all magnets are drawn
-  for (let pageIndex = 0; pageIndex < totalPages; pageIndex++) {
-    const pageY = pageIndex * pageHeightPx
-
-    // Add header for each page
-    finalCtx.fillStyle = "#000000"
-    finalCtx.font = `bold ${Math.round(0.118 * dpi)}px Arial, sans-serif`
-    finalCtx.textAlign = "left"
-
-    const totalMagnetsGenerated = images.reduce((sum, img) => sum + img.quantity, 0)
-
-    let headerText: string
-    if (pageIndex === 0) {
-      // First page: full header
-      headerText = `Pedido: ${orderInfo.orderNumber} | ${orderInfo.customerName} | ${orderInfo.phone} | ${totalMagnetsGenerated} imanes`
-    } else {
-      // Subsequent pages: simplified header
-      headerText = `${orderInfo.customerName} - Pedido: ${orderInfo.orderNumber} (Página ${pageIndex + 1})`
+      console.error(`Error adding magnet ${i + 1}:`, error)
     }
 
-    finalCtx.fillText(headerText, marginPx, pageY + marginPx + Math.round(0.236 * dpi))
-
-    // Add separator line
-    finalCtx.strokeStyle = "#C8C8C8"
-    finalCtx.lineWidth = Math.round(0.0197 * dpi)
-    finalCtx.beginPath()
-    finalCtx.moveTo(marginPx, pageY + marginPx + Math.round(0.394 * dpi))
-    finalCtx.lineTo(pageWidthPx - marginPx, pageY + marginPx + Math.round(0.394 * dpi))
-    finalCtx.stroke()
+    // Move to next position
+    currentCol++
+    if (currentCol >= cols) {
+      currentCol = 0
+      currentRow++
+    }
   }
-
-  console.log("Finished processing all magnets, converting to blob...")
 
   // Convert to blob and return
-  const blob = await new Promise<Blob>((resolve, reject) => {
+  const blob = await new Promise<Blob>((resolve) => {
     finalCanvas.toBlob(
       (blob) => {
-        if (blob) {
-          console.log(`Generated PNG blob: ${(blob.size / 1024 / 1024).toFixed(2)} MB`)
-          resolve(blob)
-        } else {
-          reject(new Error("Failed to create blob from canvas"))
-        }
+        resolve(blob!)
       },
       "image/png",
       1.0,
