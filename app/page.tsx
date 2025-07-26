@@ -105,6 +105,23 @@ const MagnetCreator = () => {
     updateImage(id, { quantity: finalQuantity })
   }
 
+  const uploadToUploadThing = async (blob: Blob, fileName: string): Promise<string> => {
+    const formData = new FormData()
+    formData.append("files", blob, fileName)
+
+    const response = await fetch("/api/uploadthing", {
+      method: "POST",
+      body: formData,
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to upload file")
+    }
+
+    const result = await response.json()
+    return result[0]?.url || result.url
+  }
+
   const handleSendOrder = async () => {
     const totalSelectedMagnets = images.reduce((sum, img) => sum + img.quantity, 0)
 
@@ -116,26 +133,37 @@ const MagnetCreator = () => {
     setIsGenerating(true)
     try {
       // Generate PNG
+      console.log("Generating PNG...")
       const blob = await generatePDFAsImage(images, orderInfo)
 
-      // Create form data for email
-      const formData = new FormData()
+      // Create filename
       const fileName = `imanes-${orderInfo.orderNumber}-${orderInfo.customerName.replace(/\s+/g, "-")}-${new Date().toISOString().split("T")[0]}.png`
-      formData.append("image", blob, fileName)
-      formData.append("orderNumber", orderInfo.orderNumber)
-      formData.append("customerName", orderInfo.customerName)
-      formData.append("phone", orderInfo.phone)
-      formData.append("totalMagnets", orderInfo.totalMagnets.toString())
 
-      // Send email
+      // Upload to UploadThing
+      console.log("Uploading to UploadThing...")
+      const fileUrl = await uploadToUploadThing(blob, fileName)
+      console.log("File uploaded successfully:", fileUrl)
+
+      // Send email with file link
+      console.log("Sending email...")
       const response = await fetch("/api/send-email", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileUrl,
+          fileName,
+          orderNumber: orderInfo.orderNumber,
+          customerName: orderInfo.customerName,
+          phone: orderInfo.phone,
+          totalMagnets: orderInfo.totalMagnets.toString(),
+        }),
       })
 
       if (response.ok) {
-        alert("¡Pedido enviado exitosamente! Recibirás una confirmación pronto.")
-        // Reset form or redirect
+        alert("¡Pedido enviado exitosamente! El archivo se ha subido y el enlace se ha enviado por email.")
+        // Reset form
         setStep("order")
         setImages([])
         setOrderInfo({
@@ -147,7 +175,7 @@ const MagnetCreator = () => {
       } else {
         const errorData = await response.json()
         console.error("Error sending email:", errorData)
-        alert("Error al enviar el pedido. Por favor, intenta de nuevo.")
+        alert("Error al enviar el email. Por favor, intenta de nuevo.")
       }
     } catch (error) {
       console.error("Error processing order:", error)
@@ -277,7 +305,7 @@ const MagnetCreator = () => {
                   <li>
                     • La suma total de copias debe ser exactamente <strong>{orderInfo.totalMagnets} imanes</strong>
                   </li>
-                  <li>• Cada imán será de 5x5 cm con bordes redondeados</li>
+                  <li>• Cada imán será de 6.5x6.5 cm con bordes redondeados</li>
                 </ul>
               </div>
               <Button onClick={handleAcceptInstructions} className="w-full">
@@ -422,7 +450,7 @@ const MagnetCreator = () => {
                   <li>• Usa el zoom o gestos táctiles para ajustar el tamaño</li>
                   <li>• Selecciona cuántas copias quieres de cada imagen</li>
                   <li>• La suma total debe ser exactamente {orderInfo.totalMagnets} imanes</li>
-                  <li>• Cada imán será de 5x5cm con bordes redondeados</li>
+                  <li>• Cada imán será de 6.5x6.5 cm con bordes redondeados</li>
                 </ul>
               </div>
             )}
@@ -446,7 +474,8 @@ const MagnetCreator = () => {
                 )}
 
                 <div className="text-xs text-gray-500 space-y-1">
-                  
+                  <p>• Se generará un PNG de máxima calidad (300 DPI)</p>
+                  <p>• El archivo se subirá a la nube y se enviará el enlace por email</p>
                 </div>
               </div>
             )}
