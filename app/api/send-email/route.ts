@@ -6,72 +6,51 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY!)
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { fileUrl, fileName, orderNumber, customerName, phone, totalMagnets } = body
+    const formData = await request.formData()
+    const imageFile = formData.get("image") as File
+    const orderNumber = formData.get("orderNumber") as string
+    const customerName = formData.get("customerName") as string
+    const phone = formData.get("phone") as string
+    const totalMagnets = formData.get("totalMagnets") as string
 
-    if (!fileUrl) {
-      return NextResponse.json({ error: "No file URL provided" }, { status: 400 })
+    if (!imageFile) {
+      return NextResponse.json({ error: "No image file provided" }, { status: 400 })
     }
 
-    // Email configuration with file link instead of attachment
+    // Convert file to buffer
+    const arrayBuffer = await imageFile.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+    const base64Image = buffer.toString("base64")
+
+    // Create filename
+    const fileName = `imanes-${orderNumber}-${customerName.replace(/\s+/g, "-")}-${new Date().toISOString().split("T")[0]}.png`
+
+    // Email configuration
     const msg = {
       to: "frixione.work@gmail.com",
       from: process.env.SENDGRID_FROM_EMAIL!,
       subject: `ARCHIVO Pedido ${orderNumber}`,
-      text: `Pedido: ${orderNumber}\nCliente: ${customerName}\nTeléfono: ${phone}\nTotal imanes: ${totalMagnets}\n\nArchivo: ${fileUrl}`,
+      text: `Pedido: ${orderNumber}\nCliente: ${customerName}\nTeléfono: ${phone}\nTotal imanes: ${totalMagnets}`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px;">
-            Nuevo pedido de imanes - #${orderNumber}
-          </h2>
-          
-          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3 style="color: #495057; margin-top: 0;">Información del pedido:</h3>
-            <table style="width: 100%; border-collapse: collapse;">
-              <tr>
-                <td style="padding: 8px 0; font-weight: bold; color: #495057;">Pedido:</td>
-                <td style="padding: 8px 0;">${orderNumber}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; font-weight: bold; color: #495057;">Cliente:</td>
-                <td style="padding: 8px 0;">${customerName}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; font-weight: bold; color: #495057;">Teléfono:</td>
-                <td style="padding: 8px 0;">${phone}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; font-weight: bold; color: #495057;">Total imanes:</td>
-                <td style="padding: 8px 0;">${totalMagnets}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; font-weight: bold; color: #495057;">Archivo:</td>
-                <td style="padding: 8px 0;">${fileName}</td>
-              </tr>
-            </table>
-          </div>
-
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${fileUrl}" 
-               style="display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;"
-               target="_blank">
-              📥 Descargar archivo PNG
-            </a>
-          </div>
-
-          <div style="background-color: #e9ecef; padding: 15px; border-radius: 6px; margin-top: 20px;">
-            <p style="margin: 0; font-size: 14px; color: #6c757d;">
-              <strong>Nota:</strong> El archivo estará disponible para descarga durante 30 días. 
-              Asegúrate de descargarlo y guardarlo en tu sistema.
-            </p>
-          </div>
-        </div>
+        <h3>Nuevo pedido de imanes</h3>
+        <p><strong>Pedido:</strong> ${orderNumber}</p>
+        <p><strong>Cliente:</strong> ${customerName}</p>
+        <p><strong>Teléfono:</strong> ${phone}</p>
+        <p><strong>Total imanes:</strong> ${totalMagnets}</p>
       `,
+      attachments: [
+        {
+          content: base64Image,
+          filename: fileName,
+          type: "image/png",
+          disposition: "attachment",
+        },
+      ],
     }
 
     console.log("Sending email to:", msg.to)
     console.log("Subject:", msg.subject)
-    console.log("File URL:", fileUrl)
+    console.log("Attachment filename:", fileName)
 
     await sgMail.send(msg)
 
