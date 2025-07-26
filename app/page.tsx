@@ -446,8 +446,7 @@ const MagnetCreator = () => {
                 )}
 
                 <div className="text-xs text-gray-500 space-y-1">
-                  <p>• Se generará un PNG de máxima calidad (300 DPI)</p>
-                  <p>• El archivo se enviará automáticamente por email</p>
+                  
                 </div>
               </div>
             )}
