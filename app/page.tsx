@@ -277,7 +277,7 @@ const MagnetCreator = () => {
                   <li>
                     • La suma total de copias debe ser exactamente <strong>{orderInfo.totalMagnets} imanes</strong>
                   </li>
-                  <li>• Cada imán será de 6.5x6.5 cm con bordes redondeados</li>
+                  <li>• Cada imán será de 5x5 cm con bordes redondeados</li>
                 </ul>
               </div>
               <Button onClick={handleAcceptInstructions} className="w-full">
@@ -422,7 +422,7 @@ const MagnetCreator = () => {
                   <li>• Usa el zoom o gestos táctiles para ajustar el tamaño</li>
                   <li>• Selecciona cuántas copias quieres de cada imagen</li>
                   <li>• La suma total debe ser exactamente {orderInfo.totalMagnets} imanes</li>
-                  <li>• Cada imán será de 6.5x6.5 cm con bordes redondeados</li>
+                  <li>• Cada imán será de 5x5cm con bordes redondeados</li>
                 </ul>
               </div>
             )}
