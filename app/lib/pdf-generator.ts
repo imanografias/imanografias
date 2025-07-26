@@ -47,6 +47,9 @@ export async function generatePDFAsImage(images: CroppedImage[], orderInfo: Orde
   const magnetsPerPage = rows * cols
   const totalPages = Math.ceil(magnetInstances.length / magnetsPerPage)
 
+  console.log(`Generating ${totalPages} pages for ${magnetInstances.length} magnets`)
+  console.log(`Layout: ${rows} rows x ${cols} cols = ${magnetsPerPage} magnets per page`)
+
   // Create final canvas with all pages
   const finalCanvas = document.createElement("canvas")
   const finalCtx = finalCanvas.getContext("2d")
@@ -59,13 +62,71 @@ export async function generatePDFAsImage(images: CroppedImage[], orderInfo: Orde
   finalCtx.fillStyle = "#FFFFFF"
   finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height)
 
-  // Process each page
+  // Helper function to load image
+  const loadImage = (src: string): Promise<HTMLImageElement> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      img.crossOrigin = "anonymous"
+      img.onload = () => resolve(img)
+      img.onerror = () => reject(new Error(`Failed to load image: ${src.substring(0, 50)}...`))
+      img.src = src
+    })
+  }
+
+  // Process all magnets sequentially
+  for (let magnetIndex = 0; magnetIndex < magnetInstances.length; magnetIndex++) {
+    const { image } = magnetInstances[magnetIndex]
+
+    if (!image.croppedDataUrl) {
+      console.warn(`Skipping magnet ${magnetIndex + 1}: no cropped data`)
+      continue
+    }
+
+    // Calculate which page this magnet belongs to
+    const pageIndex = Math.floor(magnetIndex / magnetsPerPage)
+    const magnetIndexInPage = magnetIndex % magnetsPerPage
+
+    // Calculate position within the page
+    const row = Math.floor(magnetIndexInPage / cols)
+    const col = magnetIndexInPage % cols
+
+    const x = marginPx + col * (magnetSizePx + separationPx)
+    const pageY = pageIndex * pageHeightPx
+    const startY = pageY + marginPx + Math.round(0.551 * dpi) // 14mm from top of page
+    const y = startY + row * (magnetSizePx + separationPx)
+
+    try {
+      console.log(`Processing magnet ${magnetIndex + 1}/${magnetInstances.length} on page ${pageIndex + 1}`)
+
+      // Load and draw the image
+      const img = await loadImage(image.croppedDataUrl)
+
+      // Draw the magnet image
+      finalCtx.drawImage(img, x, y, magnetSizePx, magnetSizePx)
+
+      // Draw dotted border as cutting guide
+      finalCtx.strokeStyle = "#969696"
+      finalCtx.lineWidth = Math.round(0.0079 * dpi) // 0.2mm
+      finalCtx.setLineDash([Math.round(0.059 * dpi), Math.round(0.039 * dpi)]) // 1.5mm, 1mm
+
+      const cornerRadius = Math.round(magnetSizePx * 0.123) // 8mm proportionally
+
+      // Draw rounded rectangle border
+      finalCtx.beginPath()
+      finalCtx.roundRect(x, y, magnetSizePx, magnetSizePx, cornerRadius)
+      finalCtx.stroke()
+
+      // Reset line dash
+      finalCtx.setLineDash([])
+    } catch (error) {
+      console.error(`Error processing magnet ${magnetIndex + 1}:`, error)
+      // Continue with next magnet instead of failing completely
+    }
+  }
+
+  // Add headers to all pages after all magnets are drawn
   for (let pageIndex = 0; pageIndex < totalPages; pageIndex++) {
     const pageY = pageIndex * pageHeightPx
-
-    // Fill page background
-    finalCtx.fillStyle = "#FFFFFF"
-    finalCtx.fillRect(0, pageY, pageWidthPx, pageHeightPx)
 
     // Add header for each page
     finalCtx.fillStyle = "#000000"
@@ -92,72 +153,19 @@ export async function generatePDFAsImage(images: CroppedImage[], orderInfo: Orde
     finalCtx.moveTo(marginPx, pageY + marginPx + Math.round(0.394 * dpi))
     finalCtx.lineTo(pageWidthPx - marginPx, pageY + marginPx + Math.round(0.394 * dpi))
     finalCtx.stroke()
-
-    // Calculate magnets for this page
-    const startMagnetIndex = pageIndex * magnetsPerPage
-    const endMagnetIndex = Math.min(startMagnetIndex + magnetsPerPage, magnetInstances.length)
-    const magnetsOnThisPage = magnetInstances.slice(startMagnetIndex, endMagnetIndex)
-
-    // Draw magnets on this page
-    const startY = pageY + marginPx + Math.round(0.551 * dpi) // 14mm from top of page
-
-    for (let i = 0; i < magnetsOnThisPage.length; i++) {
-      const { image } = magnetsOnThisPage[i]
-
-      if (!image.croppedDataUrl) continue
-
-      // Calculate position within the page
-      const row = Math.floor(i / cols)
-      const col = i % cols
-
-      const x = marginPx + col * (magnetSizePx + separationPx)
-      const y = startY + row * (magnetSizePx + separationPx)
-
-      try {
-        // Load and draw the image
-        const img = new Image()
-        img.crossOrigin = "anonymous"
-
-        await new Promise<void>((resolve, reject) => {
-          img.onload = () => {
-            // Draw the magnet image
-            finalCtx.drawImage(img, x, y, magnetSizePx, magnetSizePx)
-
-            // Draw dotted border as cutting guide
-            finalCtx.strokeStyle = "#969696"
-            finalCtx.lineWidth = Math.round(0.0079 * dpi) // 0.2mm
-            finalCtx.setLineDash([Math.round(0.059 * dpi), Math.round(0.039 * dpi)]) // 1.5mm, 1mm
-
-            const cornerRadius = Math.round(magnetSizePx * 0.123) // 8mm proportionally
-
-            // Draw rounded rectangle border
-            finalCtx.beginPath()
-            finalCtx.roundRect(x, y, magnetSizePx, magnetSizePx, cornerRadius)
-            finalCtx.stroke()
-
-            // Reset line dash
-            finalCtx.setLineDash([])
-
-            resolve()
-          }
-          img.onerror = () => reject(new Error(`Failed to load image ${startMagnetIndex + i + 1}`))
-          img.src = image.croppedDataUrl!
-        })
-      } catch (error) {
-        console.error(`Error adding magnet ${startMagnetIndex + i + 1}:`, error)
-        // Continue with next magnet instead of failing completely
-      }
-    }
   }
 
+  console.log("Finished processing all magnets, converting to blob...")
+
   // Convert to blob and return
-  const blob = await new Promise<Blob>((resolve) => {
+  const blob = await new Promise<Blob>((resolve, reject) => {
     finalCanvas.toBlob(
       (blob) => {
         if (blob) {
+          console.log(`Generated PNG blob: ${(blob.size / 1024 / 1024).toFixed(2)} MB`)
           resolve(blob)
         } else {
-          throw new Error("Failed to create blob from canvas")
+          reject(new Error("Failed to create blob from canvas"))
         }
       },
       "image/png",
