@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import nodemailer from "nodemailer"
 
 interface FileInfo {
   url: string
@@ -16,10 +17,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No order number provided" }, { status: 400 })
     }
 
-    // Verificar que tenemos las variables de entorno necesarias
-    if (!process.env.MAILERSEND_API_TOKEN || !process.env.MAILERSEND_FROM_EMAIL) {
-      console.error("Missing MailerSend environment variables")
-      return NextResponse.json({ error: "Email service not configured" }, { status: 500 })
+    // Verificar que tenemos las variables de entorno necesarias para Gmail
+    if (!process.env.GMAIL_EMAIL || !process.env.GMAIL_APP_PASSWORD) {
+      console.error("Missing Gmail environment variables (GMAIL_EMAIL or GMAIL_APP_PASSWORD)")
+      return NextResponse.json({ error: "Email service not configured: Gmail credentials missing" }, { status: 500 })
     }
 
     // Formatear información de archivos para el email
@@ -30,18 +31,18 @@ export async function POST(request: NextRequest) {
     const fileListHTML = filesInfo
       .map(
         (file: FileInfo, index: number) => `
-      <tr style="border-bottom: 1px solid #e9ecef;">
-        <td style="padding: 8px; font-size: 14px;">${index + 1}</td>
-        <td style="padding: 8px; font-size: 14px; font-family: monospace; background-color: #f8f9fa;">${file.name}</td>
-        <td style="padding: 8px; font-size: 12px; font-family: monospace; color: #6c757d; word-break: break-all;">${file.key}</td>
-        <td style="padding: 8px; font-size: 14px; text-align: center;">${(file.size / 1024 / 1024).toFixed(2)} MB</td>
-        <td style="padding: 8px; text-align: center;">
-          <a href="${file.url}" target="_blank" style="color: #007bff; text-decoration: none; font-size: 12px;">
-            Ver archivo
-          </a>
-        </td>
-      </tr>
-    `,
+    <tr style="border-bottom: 1px solid #e9ecef;">
+      <td style="padding: 8px; font-size: 14px;">${index + 1}</td>
+      <td style="padding: 8px; font-size: 14px; font-family: monospace; background-color: #f8f9fa;">${file.name}</td>
+      <td style="padding: 8px; font-size: 12px; font-family: monospace; color: #6c757d; word-break: break-all;">${file.key}</td>
+      <td style="padding: 8px; font-size: 14px; text-align: center;">${(file.size / 1024 / 1024).toFixed(2)} MB</td>
+      <td style="padding: 8px; text-align: center;">
+        <a href="${file.url}" target="_blank" style="color: #007bff; text-decoration: none; font-size: 12px;">
+          Ver archivo
+        </a>
+      </td>
+    </tr>
+  `,
       )
       .join("")
 
@@ -49,22 +50,24 @@ export async function POST(request: NextRequest) {
     const fileListText = filesInfo
       .map(
         (file: FileInfo, index: number) =>
-          `${index + 1}. ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)\n   Key: ${file.key}\n   URL: ${file.url}`,
+          `${index + 1}. ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)
+   Key: ${file.key}
+   URL: ${file.url}`,
       )
       .join("\n\n")
 
-    // Preparar el payload para MailerSend
-    const mailData = {
-      from: {
-        email: process.env.MAILERSEND_FROM_EMAIL,
-        name: "Imanografías - Sistema Automático",
+    // Configurar el transporter de Nodemailer para Gmail
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.GMAIL_EMAIL,
+        pass: process.env.GMAIL_APP_PASSWORD,
       },
-      to: [
-        {
-          email: "frixione.work@gmail.com",
-          name: "Imanografías",
-        },
-      ],
+    })
+
+    const mailOptions = {
+      from: `Imanografías <${process.env.GMAIL_EMAIL}>`, // Remitente
+      to: "frixione.work@gmail.com", // Destinatario
       subject: `Pedido #${orderNumber} - ${fileCount} archivo(s) generado(s)`,
       text: `
 Pedido #${orderNumber} - Fotos cargadas
@@ -148,64 +151,35 @@ Los archivos están disponibles en UploadThing bajo la carpeta N${orderNumber}.
       `,
     }
 
-    console.log("Sending email via MailerSend for order:", orderNumber)
-    console.log("From:", process.env.MAILERSEND_FROM_EMAIL)
+    console.log("Sending email via Gmail for order:", orderNumber)
+    console.log("From:", process.env.GMAIL_EMAIL)
     console.log("To: frixione.work@gmail.com")
     console.log(
       "Files info:",
       filesInfo.map((f: FileInfo) => ({ name: f.name, size: `${(f.size / 1024 / 1024).toFixed(2)}MB` })),
     )
 
-    // Enviar email usando MailerSend API
-    const response = await fetch("https://api.mailersend.com/v1/email", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.MAILERSEND_API_TOKEN}`,
-        "X-Requested-With": "XMLHttpRequest",
-      },
-      body: JSON.stringify(mailData),
-    })
+    await transporter.sendMail(mailOptions)
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error("MailerSend API error:", response.status, errorText)
-
-      let errorMessage = "Failed to send email"
-      try {
-        const errorData = JSON.parse(errorText)
-        errorMessage = errorData.message || errorData.errors?.[0]?.message || errorMessage
-      } catch (e) {
-        // Si no se puede parsear el JSON, usar el texto completo
-        errorMessage = errorText || errorMessage
-      }
-
-      return NextResponse.json(
-        {
-          error: "Failed to send email via MailerSend",
-          details: errorMessage,
-          status: response.status,
-        },
-        { status: 500 },
-      )
-    }
-
-    const responseData = await response.json()
-    console.log("MailerSend response:", responseData)
-
-    console.log("Notification email sent successfully via MailerSend")
-    return NextResponse.json({
-      success: true,
-      message: "Notification email sent successfully via MailerSend",
-      messageId: responseData.message_id,
-    })
+    console.log("Notification email sent successfully via Gmail")
+    return NextResponse.json({ success: true, message: "Notification email sent successfully via Gmail" })
   } catch (error) {
     console.error("Error sending notification email:", error)
+
+    let errorMessage = "Failed to send email"
+    if (error instanceof Error) {
+      errorMessage = error.message
+      if (error.message.includes("Invalid login")) {
+        errorMessage = "Invalid Gmail credentials. Please check your GMAIL_EMAIL and GMAIL_APP_PASSWORD."
+      } else if (error.message.includes("self-signed certificate")) {
+        errorMessage = "SSL certificate issue. Ensure your environment trusts common certificates."
+      }
+    }
 
     return NextResponse.json(
       {
         error: "Failed to send email",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: errorMessage,
       },
       { status: 500 },
     )
