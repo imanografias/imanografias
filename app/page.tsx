@@ -27,6 +27,13 @@ interface CroppedImage {
   scale: number
 }
 
+interface FileInfo {
+  url: string
+  key: string
+  name: string
+  size: number
+}
+
 const MagnetCreator = () => {
   const [step, setStep] = useState<"order" | "upload" | "processing">("order")
   const [orderInfo, setOrderInfo] = useState<OrderInfo>({
@@ -117,7 +124,7 @@ const MagnetCreator = () => {
   }
 
   // Función mejorada para upload usando el hook de UploadThing
-  const uploadToUploadThing = async (blobs: Blob[], orderNumber: string): Promise<string[]> => {
+  const uploadToUploadThing = async (blobs: Blob[], orderNumber: string): Promise<FileInfo[]> => {
     try {
       console.log(`Starting upload of ${blobs.length} files...`)
 
@@ -143,9 +150,15 @@ const MagnetCreator = () => {
 
       console.log("Upload successful:", uploadResult)
 
-      // Extraer URLs de los resultados
-      const urls = uploadResult.map((result) => result.url)
-      return urls
+      // Crear array de FileInfo con toda la información necesaria
+      const filesInfo: FileInfo[] = uploadResult.map((result) => ({
+        url: result.url,
+        key: result.key,
+        name: result.name,
+        size: result.size,
+      }))
+
+      return filesInfo
     } catch (error) {
       console.error("Error in uploadToUploadThing:", error)
       throw error
@@ -174,10 +187,10 @@ const MagnetCreator = () => {
 
       // Upload to UploadThing
       console.log("Uploading to UploadThing...")
-      const fileUrls = await uploadToUploadThing(blobs, orderInfo.orderNumber)
-      console.log("Files uploaded successfully:", fileUrls)
+      const filesInfo = await uploadToUploadThing(blobs, orderInfo.orderNumber)
+      console.log("Files uploaded successfully:", filesInfo)
 
-      // Send notification email
+      // Send notification email with file information
       console.log("Sending notification email...")
       const response = await fetch("/api/send-email", {
         method: "POST",
@@ -188,12 +201,13 @@ const MagnetCreator = () => {
           orderNumber: orderInfo.orderNumber,
           customerName: orderInfo.customerName,
           fileCount: blobs.length,
+          files: filesInfo, // Enviar información completa de archivos
         }),
       })
 
       if (response.ok) {
         alert(
-          `¡Pedido enviado exitosamente! Se generaron ${blobs.length} archivo(s) y se envió la notificación por email.`,
+          `¡Pedido enviado exitosamente! Se generaron ${blobs.length} archivo(s) y se envió la notificación por email con todos los detalles.`,
         )
         // Reset form
         setStep("order")
@@ -524,7 +538,7 @@ const MagnetCreator = () => {
                 <div className="text-xs text-gray-500 space-y-1">
                   <p>• Se generarán archivos de máxima calidad (300 DPI)</p>
                   <p>• Los archivos se subirán automáticamente</p>
-                  <p>• Se enviará una notificación por email</p>
+                  <p>• Se enviará una notificación por email con todos los detalles</p>
                 </div>
               </div>
             )}
