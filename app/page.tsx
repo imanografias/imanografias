@@ -107,25 +107,30 @@ const MagnetCreator = () => {
 
   const uploadToUploadThing = async (blobs: Blob[], orderNumber: string): Promise<string[]> => {
     const uploadPromises = blobs.map(async (blob, index) => {
-      const fileName =
-        blobs.length > 1
-          ? `N${orderNumber}/imanes-${orderNumber}-pagina-${index + 1}.png`
-          : `N${orderNumber}/imanes-${orderNumber}.png`
+      const fileName = blobs.length > 1 ? `imanes-${orderNumber}-pagina-${index + 1}.png` : `imanes-${orderNumber}.png`
 
       const formData = new FormData()
       formData.append("files", blob, fileName)
 
-      const response = await fetch("/api/uploadthing", {
-        method: "POST",
-        body: formData,
-      })
+      try {
+        const response = await fetch("/api/uploadthing", {
+          method: "POST",
+          body: formData,
+        })
 
-      if (!response.ok) {
-        throw new Error(`Failed to upload file ${index + 1}`)
+        if (!response.ok) {
+          throw new Error(`Failed to upload file ${index + 1}: ${response.statusText}`)
+        }
+
+        const result = await response.json()
+        console.log(`File ${index + 1} uploaded:`, result)
+
+        // UploadThing devuelve un array de archivos
+        return result[0]?.url || result.url
+      } catch (error) {
+        console.error(`Error uploading file ${index + 1}:`, error)
+        throw error
       }
-
-      const result = await response.json()
-      return result[0]?.url || result.url
     })
 
     return Promise.all(uploadPromises)
