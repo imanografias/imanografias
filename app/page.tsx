@@ -207,7 +207,7 @@ const MagnetCreator = () => {
 
       if (response.ok) {
         alert(
-          `¡Pedido enviado exitosamente! Se generaron ${blobs.length} archivo(s) y se envió la notificación por email con todos los detalles.`,
+          `¡Pedido enviado exitosamente!`,
         )
         // Reset form
         setStep("order")
@@ -221,7 +221,7 @@ const MagnetCreator = () => {
       } else {
         const errorData = await response.json()
         console.error("Error sending notification email:", errorData)
-        alert("Los archivos se subieron correctamente, pero hubo un error al enviar la notificación por email.")
+        alert("Los archivos se subieron correctamente, pero hubo un error al enviar la notificación por email. Notificar por telefono el envio de los archivos.")
       }
     } catch (error) {
       console.error("Error processing order:", error)
@@ -365,8 +365,8 @@ const MagnetCreator = () => {
                   <li>
                     • La suma total de copias debe ser exactamente <strong>{orderInfo.totalMagnets} imanes</strong>
                   </li>
-                  <li>• Cada imán será de 6.5x6.5 cm con bordes redondeados</li>
-                  <li>• Si hay múltiples páginas, se generarán archivos separados</li>
+                  <li>• Cada imán será de 5x5 cm con bordes redondeados</li>
+                  
                 </ul>
               </div>
               <Button onClick={handleAcceptInstructions} className="w-full">
@@ -507,12 +507,12 @@ const MagnetCreator = () => {
               <div className="mt-8 p-4 bg-blue-50 rounded-lg">
                 <h3 className="font-medium text-blue-900 mb-2">Recordatorio:</h3>
                 <ul className="text-sm text-blue-800 space-y-1">
-                  <li>• Arrastra para posicionar la imagen dentro del cuadrado</li>
+                  <li>• Posicionar la imagen dentro del cuadrado</li>
                   <li>• Usa el zoom o gestos táctiles para ajustar el tamaño</li>
                   <li>• Selecciona cuántas copias quieres de cada imagen</li>
                   <li>• La suma total debe ser exactamente {orderInfo.totalMagnets} imanes</li>
-                  <li>• Cada imán será de 6.5x6.5 cm con bordes redondeados</li>
-                  <li>• Si hay múltiples páginas, se generarán archivos separados</li>
+                  <li>• Cada imán será de 5x5 cm con bordes redondeados</li>
+                  
                 </ul>
               </div>
             )}
@@ -536,11 +536,11 @@ const MagnetCreator = () => {
                 )}
 
                 <div className="text-xs text-gray-500 space-y-1">
-                  <p>• Se generarán archivos de máxima calidad (300 DPI)</p>
-                  <p>• Los archivos se subirán automáticamente</p>
-                  <p>• Se enviará una notificación por email con todos los detalles</p>
-                </div>
-              </div>
+  <p>• Asegúrate de que las imágenes sean de buena calidad y alta resolución</p>
+  <p>• Verifica que estén correctamente posicionadas y alineadas antes de enviarlas</p>
+  <p>• No se realizarán ajustes ni correcciones una vez enviados los archivos</p>
+</div>
+
             )}
           </>
         )}
