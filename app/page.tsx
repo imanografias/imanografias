@@ -206,9 +206,7 @@ const MagnetCreator = () => {
       })
 
       if (response.ok) {
-        alert(
-          `¡Pedido enviado exitosamente!`,
-        )
+        alert(`¡Pedido enviado exitosamente!`)
         // Reset form
         setStep("order")
         setImages([])
@@ -221,7 +219,9 @@ const MagnetCreator = () => {
       } else {
         const errorData = await response.json()
         console.error("Error sending notification email:", errorData)
-        alert("Los archivos se subieron correctamente, pero hubo un error al enviar la notificación por email. Notificar por telefono el envio de los archivos.")
+        alert(
+          "Los archivos se subieron correctamente, pero hubo un error al enviar la notificación por email. Notificar por telefono el envio de los archivos.",
+        )
       }
     } catch (error) {
       console.error("Error processing order:", error)
@@ -366,7 +366,6 @@ const MagnetCreator = () => {
                     • La suma total de copias debe ser exactamente <strong>{orderInfo.totalMagnets} imanes</strong>
                   </li>
                   <li>• Cada imán será de 5x5 cm con bordes redondeados</li>
-                  
                 </ul>
               </div>
               <Button onClick={handleAcceptInstructions} className="w-full">
@@ -512,7 +511,6 @@ const MagnetCreator = () => {
                   <li>• Selecciona cuántas copias quieres de cada imagen</li>
                   <li>• La suma total debe ser exactamente {orderInfo.totalMagnets} imanes</li>
                   <li>• Cada imán será de 5x5 cm con bordes redondeados</li>
-                  
                 </ul>
               </div>
             )}
@@ -536,11 +534,11 @@ const MagnetCreator = () => {
                 )}
 
                 <div className="text-xs text-gray-500 space-y-1">
-  <p>• Asegúrate de que las imágenes sean de buena calidad y alta resolución</p>
-  <p>• Verifica que estén correctamente posicionadas y alineadas antes de enviarlas</p>
-  <p>• No se realizarán ajustes ni correcciones una vez enviados los archivos</p>
-</div>
-
+                  <p>• Asegúrate de que las imágenes sean de buena calidad y alta resolución</p>
+                  <p>• Verifica que estén correctamente posicionadas y alineadas antes de enviarlas</p>
+                  <p>• No se realizarán ajustes ni correcciones una vez enviados los archivos</p>
+                </div>
+              </div>
             )}
           </>
         )}
