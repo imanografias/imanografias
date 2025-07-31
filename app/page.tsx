@@ -109,13 +109,18 @@ const MagnetCreator = () => {
     const uploadPromises = blobs.map(async (blob, index) => {
       const fileName = blobs.length > 1 ? `imanes-${orderNumber}-pagina-${index + 1}.jpg` : `imanes-${orderNumber}.jpg`
 
-      // Crear FormData correctamente para UploadThing
-      const file = new File([blob], fileName, { type: "image/jpeg" })
-      const formData = new FormData()
-      formData.append("files", file)
-
       try {
         console.log(`Uploading file ${index + 1}: ${fileName} (${(blob.size / 1024 / 1024).toFixed(2)}MB)`)
+
+        // Usar la API de UploadThing correctamente
+        const file = new File([blob], fileName, { type: "image/jpeg" })
+
+        // Crear un FormData con el formato que espera UploadThing
+        const formData = new FormData()
+        formData.append("files", file)
+
+        // Agregar metadata si es necesario
+        formData.append("input", JSON.stringify({}))
 
         const response = await fetch("/api/uploadthing", {
           method: "POST",
@@ -142,6 +147,44 @@ const MagnetCreator = () => {
     return Promise.all(uploadPromises)
   }
 
+  // Función alternativa usando el cliente de UploadThing
+  const uploadWithUploadThingClient = async (blobs: Blob[], orderNumber: string): Promise<string[]> => {
+    const uploadPromises = blobs.map(async (blob, index) => {
+      const fileName = blobs.length > 1 ? `imanes-${orderNumber}-pagina-${index + 1}.jpg` : `imanes-${orderNumber}.jpg`
+
+      try {
+        console.log(`Uploading file ${index + 1}: ${fileName} (${(blob.size / 1024 / 1024).toFixed(2)}MB)`)
+
+        const file = new File([blob], fileName, { type: "image/jpeg" })
+
+        // Usar fetch directo con el endpoint correcto
+        const formData = new FormData()
+        formData.append("files", file)
+
+        const response = await fetch("/api/uploadthing?slug=imageUploader", {
+          method: "POST",
+          body: formData,
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error(`Upload response:`, errorText)
+          throw new Error(`Upload failed: ${response.status}`)
+        }
+
+        const result = await response.json()
+        console.log(`Upload result:`, result)
+
+        return result[0]?.url || result.url
+      } catch (error) {
+        console.error(`Error uploading file ${index + 1}:`, error)
+        throw error
+      }
+    })
+
+    return Promise.all(uploadPromises)
+  }
+
   const handleSendOrder = async () => {
     const totalSelectedMagnets = images.reduce((sum, img) => sum + img.quantity, 0)
 
@@ -152,7 +195,7 @@ const MagnetCreator = () => {
 
     setIsGenerating(true)
     try {
-      // Generate PNG pages
+      // Generate image pages
       console.log("Generating image pages...")
       const blobs = await generatePDFAsImages(images, orderInfo)
       console.log(`Generated ${blobs.length} page(s)`)
@@ -162,9 +205,9 @@ const MagnetCreator = () => {
         console.log(`Page ${index + 1} size: ${(blob.size / 1024 / 1024).toFixed(2)}MB`)
       })
 
-      // Upload to UploadThing
+      // Upload to UploadThing usando el método alternativo
       console.log("Uploading to UploadThing...")
-      const fileUrls = await uploadToUploadThing(blobs, orderInfo.orderNumber)
+      const fileUrls = await uploadWithUploadThingClient(blobs, orderInfo.orderNumber)
       console.log("Files uploaded successfully:", fileUrls)
 
       // Send notification email
@@ -206,6 +249,8 @@ const MagnetCreator = () => {
       if (error instanceof Error) {
         if (error.message.includes("413") || error.message.includes("Too Large")) {
           alert("Error: Los archivos son demasiado grandes. Intenta con menos imágenes o reduce la calidad.")
+        } else if (error.message.includes("400") || error.message.includes("Bad Request")) {
+          alert("Error: Problema con el formato de archivo. Intenta de nuevo o contacta soporte.")
         } else {
           alert(`Error al procesar el pedido: ${error.message}`)
         }
