@@ -3,31 +3,18 @@ import { createUploadthing, type FileRouter } from "uploadthing/next"
 const f = createUploadthing()
 
 export const ourFileRouter = {
-  imageUploader: f({
-    image: {
-      maxFileSize: "64MB", // Aumentado para archivos grandes
-      maxFileCount: 20, // Permitir múltiples archivos
-    },
-  })
+  imageUploader: f({ image: { maxFileSize: "64MB", maxFileCount: 20 } })
     .middleware(async ({ req }) => {
-      // Middleware opcional para autenticación
-      console.log("Upload middleware executed")
-      return { userId: "system" }
+      // Middleware simple - solo retornamos metadata básica
+      return { uploadedBy: "system" }
     })
     .onUploadComplete(async ({ metadata, file }) => {
-      console.log("Upload complete:", {
-        userId: metadata.userId,
-        fileUrl: file.url,
-        fileName: file.name,
-        fileSize: file.size,
-      })
+      // Log del archivo subido exitosamente
+      console.log("Upload complete for:", metadata.uploadedBy)
+      console.log("File URL:", file.url)
 
-      return {
-        uploadedBy: metadata.userId,
-        url: file.url,
-        name: file.name,
-        size: file.size,
-      }
+      // Retornar la información del archivo
+      return { uploadedBy: metadata.uploadedBy }
     }),
 } satisfies FileRouter
 

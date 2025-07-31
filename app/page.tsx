@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Upload, X, ArrowLeft, Plus, Minus, Info, AlertTriangle, Mail } from "lucide-react"
 import { generatePDFAsImages } from "./lib/pdf-generator"
+import { useUploadThing } from "@/lib/uploadthing"
 
 interface OrderInfo {
   orderNumber: string
@@ -40,6 +41,16 @@ const MagnetCreator = () => {
   const [instructionsAccepted, setInstructionsAccepted] = useState(false)
   const [showWarning, setShowWarning] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Hook de UploadThing
+  const { startUpload, isUploading } = useUploadThing("imageUploader", {
+    onClientUploadComplete: (res) => {
+      console.log("Files uploaded successfully:", res)
+    },
+    onUploadError: (error) => {
+      console.error("Upload error:", error)
+    },
+  })
 
   const handleOrderSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -105,84 +116,40 @@ const MagnetCreator = () => {
     updateImage(id, { quantity: finalQuantity })
   }
 
+  // Función mejorada para upload usando el hook de UploadThing
   const uploadToUploadThing = async (blobs: Blob[], orderNumber: string): Promise<string[]> => {
-    const uploadPromises = blobs.map(async (blob, index) => {
-      const fileName = blobs.length > 1 ? `imanes-${orderNumber}-pagina-${index + 1}.jpg` : `imanes-${orderNumber}.jpg`
+    try {
+      console.log(`Starting upload of ${blobs.length} files...`)
 
-      try {
-        console.log(`Uploading file ${index + 1}: ${fileName} (${(blob.size / 1024 / 1024).toFixed(2)}MB)`)
+      // Convertir blobs a Files con nombres apropiados
+      const files = blobs.map((blob, index) => {
+        const fileName =
+          blobs.length > 1 ? `imanes-${orderNumber}-pagina-${index + 1}.jpg` : `imanes-${orderNumber}.jpg`
 
-        // Usar la API de UploadThing correctamente
-        const file = new File([blob], fileName, { type: "image/jpeg" })
+        return new File([blob], fileName, { type: "image/jpeg" })
+      })
 
-        // Crear un FormData con el formato que espera UploadThing
-        const formData = new FormData()
-        formData.append("files", file)
+      // Log de información de archivos
+      files.forEach((file, index) => {
+        console.log(`File ${index + 1}: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`)
+      })
 
-        // Agregar metadata si es necesario
-        formData.append("input", JSON.stringify({}))
+      // Usar el hook de UploadThing para subir
+      const uploadResult = await startUpload(files)
 
-        const response = await fetch("/api/uploadthing", {
-          method: "POST",
-          body: formData,
-        })
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error(`Upload failed for file ${index + 1}:`, response.status, errorText)
-          throw new Error(`Failed to upload file ${index + 1}: ${response.status} ${response.statusText}`)
-        }
-
-        const result = await response.json()
-        console.log(`File ${index + 1} uploaded successfully:`, result)
-
-        // UploadThing devuelve un array de archivos
-        return result[0]?.url || result.url
-      } catch (error) {
-        console.error(`Error uploading file ${index + 1}:`, error)
-        throw error
+      if (!uploadResult) {
+        throw new Error("Upload failed - no result returned")
       }
-    })
 
-    return Promise.all(uploadPromises)
-  }
+      console.log("Upload successful:", uploadResult)
 
-  // Función alternativa usando el cliente de UploadThing
-  const uploadWithUploadThingClient = async (blobs: Blob[], orderNumber: string): Promise<string[]> => {
-    const uploadPromises = blobs.map(async (blob, index) => {
-      const fileName = blobs.length > 1 ? `imanes-${orderNumber}-pagina-${index + 1}.jpg` : `imanes-${orderNumber}.jpg`
-
-      try {
-        console.log(`Uploading file ${index + 1}: ${fileName} (${(blob.size / 1024 / 1024).toFixed(2)}MB)`)
-
-        const file = new File([blob], fileName, { type: "image/jpeg" })
-
-        // Usar fetch directo con el endpoint correcto
-        const formData = new FormData()
-        formData.append("files", file)
-
-        const response = await fetch("/api/uploadthing?slug=imageUploader", {
-          method: "POST",
-          body: formData,
-        })
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error(`Upload response:`, errorText)
-          throw new Error(`Upload failed: ${response.status}`)
-        }
-
-        const result = await response.json()
-        console.log(`Upload result:`, result)
-
-        return result[0]?.url || result.url
-      } catch (error) {
-        console.error(`Error uploading file ${index + 1}:`, error)
-        throw error
-      }
-    })
-
-    return Promise.all(uploadPromises)
+      // Extraer URLs de los resultados
+      const urls = uploadResult.map((result) => result.url)
+      return urls
+    } catch (error) {
+      console.error("Error in uploadToUploadThing:", error)
+      throw error
+    }
   }
 
   const handleSendOrder = async () => {
@@ -205,9 +172,9 @@ const MagnetCreator = () => {
         console.log(`Page ${index + 1} size: ${(blob.size / 1024 / 1024).toFixed(2)}MB`)
       })
 
-      // Upload to UploadThing usando el método alternativo
+      // Upload to UploadThing
       console.log("Uploading to UploadThing...")
-      const fileUrls = await uploadWithUploadThingClient(blobs, orderInfo.orderNumber)
+      const fileUrls = await uploadToUploadThing(blobs, orderInfo.orderNumber)
       console.log("Files uploaded successfully:", fileUrls)
 
       // Send notification email
@@ -251,6 +218,8 @@ const MagnetCreator = () => {
           alert("Error: Los archivos son demasiado grandes. Intenta con menos imágenes o reduce la calidad.")
         } else if (error.message.includes("400") || error.message.includes("Bad Request")) {
           alert("Error: Problema con el formato de archivo. Intenta de nuevo o contacta soporte.")
+        } else if (error.message.includes("Upload failed")) {
+          alert("Error: Fallo en la subida de archivos. Verifica tu conexión e intenta de nuevo.")
         } else {
           alert(`Error al procesar el pedido: ${error.message}`)
         }
@@ -538,12 +507,12 @@ const MagnetCreator = () => {
               <div className="mt-8 text-center space-y-4">
                 <Button
                   onClick={handleSendOrder}
-                  disabled={isGenerating || totalSelectedMagnets !== orderInfo.totalMagnets}
+                  disabled={isGenerating || isUploading || totalSelectedMagnets !== orderInfo.totalMagnets}
                   size="lg"
                   className="flex items-center gap-2 px-8 py-3"
                 >
                   <Mail className="w-5 h-5" />
-                  {isGenerating ? "Procesando pedido..." : "Enviar pedido"}
+                  {isGenerating ? "Procesando pedido..." : isUploading ? "Subiendo archivos..." : "Enviar pedido"}
                 </Button>
 
                 {totalSelectedMagnets !== orderInfo.totalMagnets && (
