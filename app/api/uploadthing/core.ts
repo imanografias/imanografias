@@ -3,7 +3,12 @@ import { createUploadthing, type FileRouter } from "uploadthing/next"
 const f = createUploadthing()
 
 export const ourFileRouter = {
-  imageUploader: f({ image: { maxFileSize: "32MB", maxFileCount: 10 } })
+  imageUploader: f({
+    image: {
+      maxFileSize: "64MB", // Aumentado de 32MB a 64MB
+      maxFileCount: 20, // Aumentado para múltiples páginas
+    },
+  })
     .middleware(async ({ req }) => {
       // You can add authentication here if needed
       return {}

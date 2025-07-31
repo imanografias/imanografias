@@ -138,17 +138,18 @@ export async function generatePDFAsImages(images: CroppedImage[], orderInfo: Ord
       }
     }
 
-    // Convert page to blob
+    // Convert page to blob with optimized compression
     const blob = await new Promise<Blob>((resolve) => {
       canvas.toBlob(
         (blob) => {
           resolve(blob!)
         },
-        "image/png",
-        1.0,
+        "image/jpeg", // Cambiado a JPEG para menor tamaño
+        0.95, // Alta calidad pero comprimido
       )
     })
 
+    console.log(`Page ${pageIndex + 1} blob size: ${(blob.size / 1024 / 1024).toFixed(2)}MB`)
     pageBlobs.push(blob)
   }
 

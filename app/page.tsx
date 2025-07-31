@@ -107,23 +107,29 @@ const MagnetCreator = () => {
 
   const uploadToUploadThing = async (blobs: Blob[], orderNumber: string): Promise<string[]> => {
     const uploadPromises = blobs.map(async (blob, index) => {
-      const fileName = blobs.length > 1 ? `imanes-${orderNumber}-pagina-${index + 1}.png` : `imanes-${orderNumber}.png`
+      const fileName = blobs.length > 1 ? `imanes-${orderNumber}-pagina-${index + 1}.jpg` : `imanes-${orderNumber}.jpg`
 
+      // Crear FormData correctamente para UploadThing
+      const file = new File([blob], fileName, { type: "image/jpeg" })
       const formData = new FormData()
-      formData.append("files", blob, fileName)
+      formData.append("files", file)
 
       try {
+        console.log(`Uploading file ${index + 1}: ${fileName} (${(blob.size / 1024 / 1024).toFixed(2)}MB)`)
+
         const response = await fetch("/api/uploadthing", {
           method: "POST",
           body: formData,
         })
 
         if (!response.ok) {
-          throw new Error(`Failed to upload file ${index + 1}: ${response.statusText}`)
+          const errorText = await response.text()
+          console.error(`Upload failed for file ${index + 1}:`, response.status, errorText)
+          throw new Error(`Failed to upload file ${index + 1}: ${response.status} ${response.statusText}`)
         }
 
         const result = await response.json()
-        console.log(`File ${index + 1} uploaded:`, result)
+        console.log(`File ${index + 1} uploaded successfully:`, result)
 
         // UploadThing devuelve un array de archivos
         return result[0]?.url || result.url
@@ -147,9 +153,14 @@ const MagnetCreator = () => {
     setIsGenerating(true)
     try {
       // Generate PNG pages
-      console.log("Generating PNG pages...")
+      console.log("Generating image pages...")
       const blobs = await generatePDFAsImages(images, orderInfo)
       console.log(`Generated ${blobs.length} page(s)`)
+
+      // Log blob sizes
+      blobs.forEach((blob, index) => {
+        console.log(`Page ${index + 1} size: ${(blob.size / 1024 / 1024).toFixed(2)}MB`)
+      })
 
       // Upload to UploadThing
       console.log("Uploading to UploadThing...")
@@ -172,7 +183,7 @@ const MagnetCreator = () => {
 
       if (response.ok) {
         alert(
-          `¡Pedido enviado exitosamente! Se generaron ${blobs.length} archivo(s) PNG y se envió la notificación por email.`,
+          `¡Pedido enviado exitosamente! Se generaron ${blobs.length} archivo(s) y se envió la notificación por email.`,
         )
         // Reset form
         setStep("order")
@@ -190,7 +201,17 @@ const MagnetCreator = () => {
       }
     } catch (error) {
       console.error("Error processing order:", error)
-      alert("Error al procesar el pedido. Por favor, intenta de nuevo.")
+
+      // Mostrar error más específico
+      if (error instanceof Error) {
+        if (error.message.includes("413") || error.message.includes("Too Large")) {
+          alert("Error: Los archivos son demasiado grandes. Intenta con menos imágenes o reduce la calidad.")
+        } else {
+          alert(`Error al procesar el pedido: ${error.message}`)
+        }
+      } else {
+        alert("Error al procesar el pedido. Por favor, intenta de nuevo.")
+      }
     } finally {
       setIsGenerating(false)
     }
@@ -317,7 +338,7 @@ const MagnetCreator = () => {
                     • La suma total de copias debe ser exactamente <strong>{orderInfo.totalMagnets} imanes</strong>
                   </li>
                   <li>• Cada imán será de 6.5x6.5 cm con bordes redondeados</li>
-                  <li>• Si hay múltiples páginas, se generarán archivos PNG separados</li>
+                  <li>• Si hay múltiples páginas, se generarán archivos separados</li>
                 </ul>
               </div>
               <Button onClick={handleAcceptInstructions} className="w-full">
@@ -463,7 +484,7 @@ const MagnetCreator = () => {
                   <li>• Selecciona cuántas copias quieres de cada imagen</li>
                   <li>• La suma total debe ser exactamente {orderInfo.totalMagnets} imanes</li>
                   <li>• Cada imán será de 6.5x6.5 cm con bordes redondeados</li>
-                  <li>• Si hay múltiples páginas, se generarán archivos PNG separados</li>
+                  <li>• Si hay múltiples páginas, se generarán archivos separados</li>
                 </ul>
               </div>
             )}
@@ -487,8 +508,8 @@ const MagnetCreator = () => {
                 )}
 
                 <div className="text-xs text-gray-500 space-y-1">
-                  <p>• Se generarán PNG de máxima calidad (300 DPI)</p>
-                  <p>• Los archivos se subirán a la carpeta N{orderInfo.orderNumber}</p>
+                  <p>• Se generarán archivos de máxima calidad (300 DPI)</p>
+                  <p>• Los archivos se subirán automáticamente</p>
                   <p>• Se enviará una notificación por email</p>
                 </div>
               </div>
@@ -591,7 +612,7 @@ const ImageCropper = ({ image, maxQuantity, onRemove, onUpdate, onQuantityChange
     // Draw the masked result onto main canvas
     ctx.drawImage(tempCanvas, 0, 0)
 
-    const croppedDataUrl = canvas.toDataURL("image/png", 1.0) // Changed to PNG for better quality
+    const croppedDataUrl = canvas.toDataURL("image/jpeg", 0.95) // Cambiado a JPEG con alta calidad
     onUpdateRef.current({ croppedDataUrl })
   }, [image.position.x, image.position.y, image.scale, imageElement, isImageLoaded])
 
