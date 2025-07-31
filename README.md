@@ -1,30 +1,39 @@
-# Convertir pdf a imagen
+# Imanografías - Generador de Imanes Personalizados
 
-*Automatically synced with your [v0.dev](https://v0.dev) deployments*
+Una aplicación web para generar imanes personalizados con fotos de alta calidad.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/frixionework-1794s-projects/imanografias)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/aTKsJIyMoO0)
+## Características
 
-## Overview
+- Interfaz intuitiva para subir y editar fotos
+- Generación de archivos PNG de alta calidad (300 DPI)
+- Soporte para múltiples páginas
+- Integración con UploadThing para almacenamiento en la nube
+- Notificaciones por email con SendGrid
+- Organización automática por número de pedido
 
-This repository will stay in sync with your deployed chats on [v0.dev](https://v0.dev).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.dev](https://v0.dev).
+## Configuración
 
-## Deployment
+### Variables de entorno requeridas:
 
-Your project is live at:
+\`\`\`env
+SENDGRID_API_KEY=tu_sendgrid_api_key
+SENDGRID_FROM_EMAIL=tu_email_verificado
+UPLOADTHING_SECRET=tu_uploadthing_secret
+UPLOADTHING_APP_ID=tu_uploadthing_app_id
+\`\`\`
 
-**[https://vercel.com/frixionework-1794s-projects/imanografias](https://vercel.com/frixionework-1794s-projects/imanografias)**
+### Instalación
 
-## Build your app
+\`\`\`bash
+npm install
+npm run dev
+\`\`\`
 
-Continue building your app on:
+## Uso
 
-**[https://v0.dev/chat/projects/aTKsJIyMoO0](https://v0.dev/chat/projects/aTKsJIyMoO0)**
+1. Completa la información del pedido
+2. Sube las fotos y ajusta posición/zoom
+3. Selecciona la cantidad de copias de cada imagen
+4. Envía el pedido
 
-## How It Works
-
-1. Create and modify your project using [v0.dev](https://v0.dev)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+Los archivos se subirán automáticamente a UploadThing organizados en carpetas por número de pedido (Nx) y se enviará una notificación por email.

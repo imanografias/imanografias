@@ -1,14 +1,22 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 
-const inter = Inter({ subsets: ["latin"] })
+const geist = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+})
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+})
 
 export const metadata: Metadata = {
-  title: "Imanografías",
-  description: "Generador de imanes personalizados",
-  generator: "Next.js",
+  title: "Imanografías - Generador de Imanes Personalizados",
+  description: "Crea imanes personalizados con tus fotos favoritas",
+    generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -18,10 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-      </head>
-      <body className={inter.className}>{children}</body>
+      <body className={`${geist.variable} ${geistMono.variable} antialiased`}>{children}</body>
     </html>
   )
 }

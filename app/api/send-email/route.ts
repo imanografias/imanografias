@@ -6,58 +6,51 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY!)
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData()
-    const imageFile = formData.get("image") as File
-    const orderNumber = formData.get("orderNumber") as string
-    const customerName = formData.get("customerName") as string
-    const phone = formData.get("phone") as string
-    const totalMagnets = formData.get("totalMagnets") as string
+    const body = await request.json()
+    const { orderNumber, customerName, fileCount } = body
 
-    if (!imageFile) {
-      return NextResponse.json({ error: "No image file provided" }, { status: 400 })
+    if (!orderNumber) {
+      return NextResponse.json({ error: "No order number provided" }, { status: 400 })
     }
 
-    // Convert file to buffer
-    const arrayBuffer = await imageFile.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-    const base64Image = buffer.toString("base64")
-
-    // Create filename
-    const fileName = `imanes-${orderNumber}-${customerName.replace(/\s+/g, "-")}-${new Date().toISOString().split("T")[0]}.png`
-
-    // Email configuration
+    // Simple notification email
     const msg = {
       to: "frixione.work@gmail.com",
       from: process.env.SENDGRID_FROM_EMAIL!,
-      subject: `ARCHIVO Pedido ${orderNumber}`,
-      text: `Pedido: ${orderNumber}\nCliente: ${customerName}\nTeléfono: ${phone}\nTotal imanes: ${totalMagnets}`,
+      subject: `Pedido #${orderNumber} - Fotos cargadas`,
+      text: `El pedido #${orderNumber} de ${customerName} ya cargó sus fotos. Se generaron ${fileCount} archivo(s) PNG.`,
       html: `
-        <h3>Nuevo pedido de imanes</h3>
-        <p><strong>Pedido:</strong> ${orderNumber}</p>
-        <p><strong>Cliente:</strong> ${customerName}</p>
-        <p><strong>Teléfono:</strong> ${phone}</p>
-        <p><strong>Total imanes:</strong> ${totalMagnets}</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px;">
+            📸 Pedido #${orderNumber} - Fotos cargadas
+          </h2>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 16px; color: #495057;">
+              El pedido <strong>#${orderNumber}</strong> de <strong>${customerName}</strong> ya cargó sus fotos.
+            </p>
+            <p style="margin: 10px 0 0 0; font-size: 14px; color: #6c757d;">
+              Se generaron <strong>${fileCount} archivo(s) PNG</strong> listos para producción.
+            </p>
+          </div>
+
+          <div style="background-color: #e9ecef; padding: 15px; border-radius: 6px; margin-top: 20px;">
+            <p style="margin: 0; font-size: 14px; color: #6c757d;">
+              Los archivos están disponibles en UploadThing bajo la carpeta <strong>N${orderNumber}</strong>.
+            </p>
+          </div>
+        </div>
       `,
-      attachments: [
-        {
-          content: base64Image,
-          filename: fileName,
-          type: "image/png",
-          disposition: "attachment",
-        },
-      ],
     }
 
-    console.log("Sending email to:", msg.to)
-    console.log("Subject:", msg.subject)
-    console.log("Attachment filename:", fileName)
+    console.log("Sending notification email for order:", orderNumber)
 
     await sgMail.send(msg)
 
-    console.log("Email sent successfully")
-    return NextResponse.json({ success: true, message: "Email sent successfully" })
+    console.log("Notification email sent successfully")
+    return NextResponse.json({ success: true, message: "Notification email sent successfully" })
   } catch (error) {
-    console.error("Error sending email:", error)
+    console.error("Error sending notification email:", error)
 
     if (error && typeof error === "object" && "response" in error) {
       const sgError = error as any

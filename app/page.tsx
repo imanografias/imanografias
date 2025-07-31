@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Upload, X, ArrowLeft, Plus, Minus, Info, AlertTriangle, Mail } from "lucide-react"
-import { generatePDFAsImage } from "./lib/pdf-generator"
+import { generatePDFAsImages } from "./lib/pdf-generator"
 
 interface OrderInfo {
   orderNumber: string
@@ -105,6 +105,32 @@ const MagnetCreator = () => {
     updateImage(id, { quantity: finalQuantity })
   }
 
+  const uploadToUploadThing = async (blobs: Blob[], orderNumber: string): Promise<string[]> => {
+    const uploadPromises = blobs.map(async (blob, index) => {
+      const fileName =
+        blobs.length > 1
+          ? `N${orderNumber}/imanes-${orderNumber}-pagina-${index + 1}.png`
+          : `N${orderNumber}/imanes-${orderNumber}.png`
+
+      const formData = new FormData()
+      formData.append("files", blob, fileName)
+
+      const response = await fetch("/api/uploadthing", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to upload file ${index + 1}`)
+      }
+
+      const result = await response.json()
+      return result[0]?.url || result.url
+    })
+
+    return Promise.all(uploadPromises)
+  }
+
   const handleSendOrder = async () => {
     const totalSelectedMagnets = images.reduce((sum, img) => sum + img.quantity, 0)
 
@@ -115,27 +141,35 @@ const MagnetCreator = () => {
 
     setIsGenerating(true)
     try {
-      // Generate PNG
-      const blob = await generatePDFAsImage(images, orderInfo)
+      // Generate PNG pages
+      console.log("Generating PNG pages...")
+      const blobs = await generatePDFAsImages(images, orderInfo)
+      console.log(`Generated ${blobs.length} page(s)`)
 
-      // Create form data for email
-      const formData = new FormData()
-      const fileName = `imanes-${orderInfo.orderNumber}-${orderInfo.customerName.replace(/\s+/g, "-")}-${new Date().toISOString().split("T")[0]}.png`
-      formData.append("image", blob, fileName)
-      formData.append("orderNumber", orderInfo.orderNumber)
-      formData.append("customerName", orderInfo.customerName)
-      formData.append("phone", orderInfo.phone)
-      formData.append("totalMagnets", orderInfo.totalMagnets.toString())
+      // Upload to UploadThing
+      console.log("Uploading to UploadThing...")
+      const fileUrls = await uploadToUploadThing(blobs, orderInfo.orderNumber)
+      console.log("Files uploaded successfully:", fileUrls)
 
-      // Send email
+      // Send notification email
+      console.log("Sending notification email...")
       const response = await fetch("/api/send-email", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          orderNumber: orderInfo.orderNumber,
+          customerName: orderInfo.customerName,
+          fileCount: blobs.length,
+        }),
       })
 
       if (response.ok) {
-        alert("¡Pedido enviado exitosamente! Recibirás una confirmación pronto.")
-        // Reset form or redirect
+        alert(
+          `¡Pedido enviado exitosamente! Se generaron ${blobs.length} archivo(s) PNG y se envió la notificación por email.`,
+        )
+        // Reset form
         setStep("order")
         setImages([])
         setOrderInfo({
@@ -146,8 +180,8 @@ const MagnetCreator = () => {
         })
       } else {
         const errorData = await response.json()
-        console.error("Error sending email:", errorData)
-        alert("Error al enviar el pedido. Por favor, intenta de nuevo.")
+        console.error("Error sending notification email:", errorData)
+        alert("Los archivos se subieron correctamente, pero hubo un error al enviar la notificación por email.")
       }
     } catch (error) {
       console.error("Error processing order:", error)
@@ -277,7 +311,8 @@ const MagnetCreator = () => {
                   <li>
                     • La suma total de copias debe ser exactamente <strong>{orderInfo.totalMagnets} imanes</strong>
                   </li>
-                  <li>• Cada imán será de 5x5 cm con bordes redondeados</li>
+                  <li>• Cada imán será de 6.5x6.5 cm con bordes redondeados</li>
+                  <li>• Si hay múltiples páginas, se generarán archivos PNG separados</li>
                 </ul>
               </div>
               <Button onClick={handleAcceptInstructions} className="w-full">
@@ -422,7 +457,8 @@ const MagnetCreator = () => {
                   <li>• Usa el zoom o gestos táctiles para ajustar el tamaño</li>
                   <li>• Selecciona cuántas copias quieres de cada imagen</li>
                   <li>• La suma total debe ser exactamente {orderInfo.totalMagnets} imanes</li>
-                  <li>• Cada imán será de 5x5cm con bordes redondeados</li>
+                  <li>• Cada imán será de 6.5x6.5 cm con bordes redondeados</li>
+                  <li>• Si hay múltiples páginas, se generarán archivos PNG separados</li>
                 </ul>
               </div>
             )}
@@ -436,7 +472,7 @@ const MagnetCreator = () => {
                   className="flex items-center gap-2 px-8 py-3"
                 >
                   <Mail className="w-5 h-5" />
-                  {isGenerating ? "Enviando pedido..." : "Enviar pedido"}
+                  {isGenerating ? "Procesando pedido..." : "Enviar pedido"}
                 </Button>
 
                 {totalSelectedMagnets !== orderInfo.totalMagnets && (
@@ -446,7 +482,9 @@ const MagnetCreator = () => {
                 )}
 
                 <div className="text-xs text-gray-500 space-y-1">
-                  
+                  <p>• Se generarán PNG de máxima calidad (300 DPI)</p>
+                  <p>• Los archivos se subirán a la carpeta N{orderInfo.orderNumber}</p>
+                  <p>• Se enviará una notificación por email</p>
                 </div>
               </div>
             )}
