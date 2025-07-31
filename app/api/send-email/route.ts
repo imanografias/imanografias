@@ -1,8 +1,4 @@
-import sgMail from "@sendgrid/mail"
 import { type NextRequest, NextResponse } from "next/server"
-
-// Configure SendGrid
-sgMail.setApiKey(process.env.SENDGRID_API_KEY!)
 
 interface FileInfo {
   url: string
@@ -18,6 +14,12 @@ export async function POST(request: NextRequest) {
 
     if (!orderNumber) {
       return NextResponse.json({ error: "No order number provided" }, { status: 400 })
+    }
+
+    // Verificar que tenemos las variables de entorno necesarias
+    if (!process.env.MAILERSEND_API_TOKEN || !process.env.MAILERSEND_FROM_EMAIL) {
+      console.error("Missing MailerSend environment variables")
+      return NextResponse.json({ error: "Email service not configured" }, { status: 500 })
     }
 
     // Formatear información de archivos para el email
@@ -51,9 +53,18 @@ export async function POST(request: NextRequest) {
       )
       .join("\n\n")
 
-    const msg = {
-      to: "frixione.work@gmail.com",
-      from: process.env.SENDGRID_FROM_EMAIL!,
+    // Preparar el payload para MailerSend
+    const mailData = {
+      from: {
+        email: process.env.MAILERSEND_FROM_EMAIL,
+        name: "Imanografías - Sistema Automático",
+      },
+      to: [
+        {
+          email: "frixione.work@gmail.com",
+          name: "Imanografías",
+        },
+      ],
       subject: `Pedido #${orderNumber} - ${fileCount} archivo(s) generado(s)`,
       text: `
 Pedido #${orderNumber} - Fotos cargadas
@@ -137,27 +148,65 @@ Los archivos están disponibles en UploadThing bajo la carpeta N${orderNumber}.
       `,
     }
 
-    console.log("Sending notification email for order:", orderNumber)
+    console.log("Sending email via MailerSend for order:", orderNumber)
+    console.log("From:", process.env.MAILERSEND_FROM_EMAIL)
+    console.log("To: frixione.work@gmail.com")
     console.log(
       "Files info:",
       filesInfo.map((f: FileInfo) => ({ name: f.name, size: `${(f.size / 1024 / 1024).toFixed(2)}MB` })),
     )
 
-    await sgMail.send(msg)
+    // Enviar email usando MailerSend API
+    const response = await fetch("https://api.mailersend.com/v1/email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.MAILERSEND_API_TOKEN}`,
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: JSON.stringify(mailData),
+    })
 
-    console.log("Notification email sent successfully")
-    return NextResponse.json({ success: true, message: "Notification email sent successfully" })
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error("MailerSend API error:", response.status, errorText)
+
+      let errorMessage = "Failed to send email"
+      try {
+        const errorData = JSON.parse(errorText)
+        errorMessage = errorData.message || errorData.errors?.[0]?.message || errorMessage
+      } catch (e) {
+        // Si no se puede parsear el JSON, usar el texto completo
+        errorMessage = errorText || errorMessage
+      }
+
+      return NextResponse.json(
+        {
+          error: "Failed to send email via MailerSend",
+          details: errorMessage,
+          status: response.status,
+        },
+        { status: 500 },
+      )
+    }
+
+    const responseData = await response.json()
+    console.log("MailerSend response:", responseData)
+
+    console.log("Notification email sent successfully via MailerSend")
+    return NextResponse.json({
+      success: true,
+      message: "Notification email sent successfully via MailerSend",
+      messageId: responseData.message_id,
+    })
   } catch (error) {
     console.error("Error sending notification email:", error)
 
-    if (error && typeof error === "object" && "response" in error) {
-      const sgError = error as any
-      console.error("SendGrid error details:", sgError.response?.body)
-      return NextResponse.json({ error: "Failed to send email", details: sgError.response?.body }, { status: 500 })
-    }
-
     return NextResponse.json(
-      { error: "Failed to send email", details: error instanceof Error ? error.message : "Unknown error" },
+      {
+        error: "Failed to send email",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 },
     )
   }
