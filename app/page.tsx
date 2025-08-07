@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Upload, X, ArrowLeft, Plus, Minus, Info, AlertTriangle, Mail } from "lucide-react"
+import { Upload, X, ArrowLeft, Plus, Minus, Info, AlertTriangle, Mail, Target } from 'lucide-react'
 import { generatePDFAsImages } from "./lib/pdf-generator"
 import { useUploadThing } from "@/lib/uploadthing"
 
@@ -739,6 +739,10 @@ const ImageCropper = ({ image, maxQuantity, onRemove, onUpdate, onQuantityChange
     onUpdate({ scale: newScale })
   }
 
+  const handleCenterImage = () => {
+    onUpdate({ position: { x: 0, y: 0 } });
+  };
+
   React.useEffect(() => {
     handleImageLoad()
   }, [handleImageLoad])
@@ -828,6 +832,32 @@ const ImageCropper = ({ image, maxQuantity, onRemove, onUpdate, onQuantityChange
                   ctx.roundRect(marginPx, marginPx, maskSize, maskSize, cornerRadius)
                   ctx.stroke()
                   ctx.restore()
+
+                  // GRID
+                  ctx.save()
+                  ctx.strokeStyle = "rgba(255, 255, 255, 0.5)" // White, semi-transparent lines
+                  ctx.lineWidth = 2 // Thinner lines for the grid
+
+                  const gridAreaX = marginPx
+                  const gridAreaY = marginPx
+                  const gridAreaSize = maskSize
+
+                  // Vertical lines
+                  ctx.beginPath()
+                  ctx.moveTo(gridAreaX + gridAreaSize / 3, gridAreaY)
+                  ctx.lineTo(gridAreaX + gridAreaSize / 3, gridAreaY + gridAreaSize)
+                  ctx.moveTo(gridAreaX + (gridAreaSize * 2) / 3, gridAreaY)
+                  ctx.lineTo(gridAreaX + (gridAreaSize * 2) / 3, gridAreaY + gridAreaSize)
+                  ctx.stroke()
+
+                  // Horizontal lines
+                  ctx.beginPath()
+                  ctx.moveTo(gridAreaX, gridAreaY + gridAreaSize / 3)
+                  ctx.lineTo(gridAreaX + gridAreaSize, gridAreaY + gridAreaSize / 3)
+                  ctx.moveTo(gridAreaX, gridAreaY + (gridAreaSize * 2) / 3)
+                  ctx.lineTo(gridAreaX + gridAreaSize, gridAreaY + (gridAreaSize * 2) / 3)
+                  ctx.stroke()
+                  ctx.restore()
                 }}
               />
 
@@ -901,6 +931,18 @@ const ImageCropper = ({ image, maxQuantity, onRemove, onUpdate, onQuantityChange
                 <span>300%</span>
               </div>
             </div>
+          </div>
+
+          <div className="flex justify-center mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCenterImage}
+              className="flex items-center gap-2"
+            >
+              <Target className="w-4 h-4" />
+              Centrar Imagen
+            </Button>
           </div>
 
           <div>
