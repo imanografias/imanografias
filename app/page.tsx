@@ -360,6 +360,7 @@ const MagnetCreator = () => {
                     • Puedes subir máximo <strong>{orderInfo.totalMagnets} imágenes</strong>
                   </li>
                   <li>• Arrastra para posicionar la imagen dentro del cuadrado</li>
+                  <li>• Si se dejan bandas blancas, quedaran en el imán</li>
                   <li>• Usa el zoom o gestos táctiles para ajustar el tamaño</li>
                   <li>• Selecciona cuántas copias quieres de cada imagen</li>
                   <li>
@@ -482,7 +483,7 @@ const MagnetCreator = () => {
                 Seleccionar archivos
               </Button>
               <p className="text-xs text-gray-500 mt-2">
-                Máximo {orderInfo.totalMagnets} imágenes. Formatos: JPG, PNG, GIF
+                Máximo {orderInfo.totalMagnets} imágenes. Formatos: JPG, PNG
               </p>
             </div>
           )}
@@ -508,6 +509,7 @@ const MagnetCreator = () => {
                 <h3 className="font-medium text-blue-900 mb-2">Recordatorio:</h3>
                 <ul className="text-sm text-blue-800 space-y-1">
                   <li>• Posicionar la imagen dentro del cuadrado</li>
+                  <li>• Si se dejan bandas blancas, se veran en el imán</li>
                   <li>• Usa el zoom o gestos táctiles para ajustar el tamaño</li>
                   <li>• Selecciona cuántas copias quieres de cada imagen</li>
                   <li>• La suma total debe ser exactamente {orderInfo.totalMagnets} imanes</li>
@@ -808,7 +810,8 @@ const ImageCropper = ({ image, maxQuantity, onRemove, onUpdate, onQuantityChange
                   const cornerRadius = 18 * 2
 
                   ctx.save()
-                  ctx.fillStyle = "rgb(243, 244, 246,0.9)"
+                  // MASCARA
+                  ctx.fillStyle = "rgb(57, 57, 57,0.9)"
                   ctx.fillRect(0, 0, size, size)
 
                   ctx.globalCompositeOperation = "destination-out"
@@ -816,11 +819,11 @@ const ImageCropper = ({ image, maxQuantity, onRemove, onUpdate, onQuantityChange
                   ctx.roundRect(marginPx, marginPx, maskSize, maskSize, cornerRadius)
                   ctx.fill()
                   ctx.restore()
-
+                  // BORDE
                   ctx.save()
                   ctx.globalCompositeOperation = "source-over"
-                  ctx.strokeStyle = "rgba(255,255,255,0.8)"
-                  ctx.lineWidth = 6 // Adjusted for higher resolution
+                  ctx.strokeStyle = "rgba(57,57,57,1)"
+                  ctx.lineWidth = 12 // Adjusted for higher resolution
                   ctx.beginPath()
                   ctx.roundRect(marginPx, marginPx, maskSize, maskSize, cornerRadius)
                   ctx.stroke()
