@@ -22,8 +22,8 @@ export async function generatePDFAsImages(images: CroppedImage[], orderInfo: Ord
   const pageHeightPx = Math.round(11.69 * dpi) // 3507px
   const marginPx = Math.round(0.197 * dpi) // 5mm in pixels
 
-  // Magnet size in pixels (6cm at 300 DPI) - Cambiado de 6.5cm a 6cm
-  const magnetSizePx = Math.round((6 / 2.54) * dpi) // ~709px (antes era ~767px)
+  // Magnet size in pixels (6.2cm at 300 DPI) - Ajustado para compensar 2mm
+  const magnetSizePx = Math.round((6.2 / 2.54) * dpi) // ~732px
 
   // Calculate layout
   const availableWidth = pageWidthPx - 2 * marginPx
@@ -118,7 +118,7 @@ export async function generatePDFAsImages(images: CroppedImage[], orderInfo: Ord
             ctx.lineWidth = Math.round(0.0079 * dpi) // 0.2mm
             ctx.setLineDash([Math.round(0.059 * dpi), Math.round(0.039 * dpi)]) // 1.5mm, 1mm
 
-            const cornerRadius = Math.round(magnetSizePx * 0.113) // 6mm proporcionalmente para 6cm
+            const cornerRadius = Math.round(magnetSizePx * 0.097) // Ajustado para 6.2cm
 
             // Draw rounded rectangle border
             ctx.beginPath()
