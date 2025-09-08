@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Imanografías - Generador de Imanes Personalizados",
   description: "Crea imanes personalizados con tus fotos favoritas",
-    generator: 'v0.dev'
+    generator: 'v0.app'
 }
 
 export default function RootLayout({
