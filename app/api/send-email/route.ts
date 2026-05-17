@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     const mailOptions = {
       from: `Imanografías <${process.env.GMAIL_EMAIL}>`, // Remitente
-      to: "frixione.work@gmail.com", // Destinatario
+      to: `Imanografías <${process.env.GMAIL_EMAIL}>`, // Destinatario
       subject: `Pedido #${orderNumber} - ${fileCount} archivo(s) generado(s)`,
       text: `
 Pedido #${orderNumber} - Fotos cargadas
@@ -153,7 +153,7 @@ Los archivos están disponibles en UploadThing bajo la carpeta N${orderNumber}.
 
     console.log("Sending email via Gmail for order:", orderNumber)
     console.log("From:", process.env.GMAIL_EMAIL)
-    console.log("To: frixione.work@gmail.com")
+    console.log("To:", process.env.GMAIL_TO)
     console.log(
       "Files info:",
       filesInfo.map((f: FileInfo) => ({ name: f.name, size: `${(f.size / 1024 / 1024).toFixed(2)}MB` })),
